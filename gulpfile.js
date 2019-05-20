@@ -11,17 +11,16 @@ var gulp = require('gulp'),
   sourcemaps = require('gulp-sourcemaps'),
   path = require('path'),
   del = require('del'),
-  merge = require('merge-stream'),
-  plumber = require('gulp-plumber');
+  merge = require('merge-stream');
 
-gulp.task('cleanCSS', function() {
-  return del(['build/css']);
-});
-gulp.task('cleanJS', function() {
-  return del(['build/js']);
-});
+gulp.task('cleanCSS', () =>
+  del(['build/css'])
+);
+gulp.task('cleanJS', () =>
+  del(['build/js'])
+);
 
-gulp.task('csslint', function() {
+gulp.task('csslint', gulp.series(() =>
   gulp.src('src/*.css')
     .pipe(csslint({
       'adjoining-classes': false,
@@ -30,45 +29,46 @@ gulp.task('csslint', function() {
       'fallback-colors': false,
       'order-alphabetical': false
     }))
-    .pipe(csslint.formatter());
-});
+    .pipe(csslint.formatter())
+));
 
-gulp.task('css', ['csslint', 'cleanCSS'], function() {
-  return gulp.src('src/*.css')
+gulp.task('css', gulp.series('csslint', 'cleanCSS', () =>
+  gulp.src('src/*.css')
     .pipe(sourcemaps.init())
     .pipe(cleanCSS())
     .pipe(rename('orgchart.min.css'))
     .pipe(sourcemaps.write())
     .pipe(gulp.dest('build/css'))
-    .pipe(gulp.dest('demo/css'));
-});
+    .pipe(gulp.dest('demo/css'))
+));
 
-gulp.task('eslint', function () {
-  return gulp.src(['src/*.js'])
+gulp.task('eslint', gulp.series(() =>
+  gulp.src(['src/*.js'])
     .pipe(eslint('.eslintrc.json'))
     .pipe(eslint.format())
-    .pipe(eslint.failOnError());
-});
+    .pipe(eslint.failOnError())
+));
 
-gulp.task('js', ['eslint', 'cleanJS'], function () {
-  return gulp.src(['src/*.js'])
+gulp.task('js', gulp.series('eslint', 'cleanJS', () =>
+  gulp.src(['src/*.js'])
     .pipe(sourcemaps.init())
-    .pipe(babel(
-      {presets: ['es2015']}
-    ))
+    .pipe(babel({
+      presets: ["@babel/preset-env"]
+    }))
     .pipe(uglify())
     .pipe(rename('orgchart.min.js'))
     .pipe(sourcemaps.write())
     .pipe(gulp.dest('build/js'))
-    .pipe(gulp.dest('demo/js'));
-});
+    .pipe(gulp.dest('demo/js'))
+));
 
-gulp.task('watch', function () {
-  gulp.watch('src/*.js', ['js']);
-  gulp.watch('src/*.css', ['css']);
-});
+gulp.task('watch', gulp.series((done) => {
+  gulp.watch('src/*.js', gulp.series('js'));
+  gulp.watch('src/*.css', gulp.series('css'));
+  done();
+}));
 
-gulp.task('copyVendorAssets', function() {
+gulp.task('copyVendorAssets', gulp.series(() => {
   var fontawesomeCSS = gulp.src('node_modules/font-awesome/css/font-awesome.min.css')
     .pipe(gulp.dest('demo/css/vendor'));
 
@@ -79,20 +79,20 @@ gulp.task('copyVendorAssets', function() {
     .pipe(gulp.dest('demo/js/vendor'));
 
   return merge(fontawesomeCSS, fontawesomeFonts, html2canvas);
-});
+}));
 
-gulp.task('build', ['css', 'js', 'watch']);
+gulp.task('build', gulp.series('css', 'js'));
 
-gulp.task('webpack', ['build'], function () {
-  webpack(require('./webpack.config.js'), function(err, stats) {
+gulp.task('webpack', gulp.series('build', () => {
+  webpack(require('./webpack.config.js'), function (err, stats) {
     if (err) {
       throw new gutil.PluginError('webpack', err);
     }
     gutil.log('[webpack]', stats.toString());
   });
-});
+}));
 
-gulp.task('serve', ['copyVendorAssets', 'webpack'], function () {
+gulp.task('serve', gulp.series('copyVendorAssets', 'webpack', (done) => {
   browserSync.init({
     files: ['src/*.css', 'demo/**/*.html', 'demo/**/*.css', '!demo/css/vendor/*.css'],
     server: 'demo',
@@ -101,11 +101,11 @@ gulp.task('serve', ['copyVendorAssets', 'webpack'], function () {
     }
   });
 
-  gulp.watch('src/*.js', ['webpack']);
+  gulp.watch('src/*.js', gulp.series('webpack'));
 
   gulp.watch('demo/js/*').on('change', browserSync.reload);
 
-  gulp.watch(['demo/**/*.js', '!demo/js/*', '!demo/js/vendor/*', '!demo/**/bundle*.js']).on('change', function(file) {
+  gulp.watch(['demo/**/*.js', '!demo/js/*', '!demo/js/vendor/*', '!demo/**/bundle*.js']).on('change', function (file) {
     webpack({
       entry: file.path,
       output: {
@@ -114,16 +114,14 @@ gulp.task('serve', ['copyVendorAssets', 'webpack'], function () {
       },
       devtool: 'source-map',
       module: {
-        loaders: [
-          {
-            loader: 'babel',
-            query: {
-              presets: ['es2015']
-            }
+        rules: [{
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env']
           }
-        ]
+        }]
       }
-    }, function(err, stats) {
+    }, function (err, stats) {
       if (err) {
         throw new gutil.PluginError('webpack', err);
       }
@@ -131,4 +129,6 @@ gulp.task('serve', ['copyVendorAssets', 'webpack'], function () {
     });
   });
 
-});
+  done();
+
+}));

@@ -1,3 +1,5 @@
+const path = require('path');
+
 module.exports = {
   entry: {
     'ajax-datasource/bundle': './demo/ajax-datasource/scripts.js',
@@ -20,18 +22,16 @@ module.exports = {
     'vertical-depth/bundle': './demo/vertical-depth/scripts.js'
   },
   output: {
-    path: './demo/',
+    path: path.resolve(__dirname, 'demo'),
     filename: '[name].js'
   },
   devtool: 'source-map',
   module: {
-    loaders: [
-      {
-        loader: 'babel',
-        query: {
-          presets: ['es2015']
-        }
+    rules: [{
+      loader: 'babel-loader',
+      options: {
+        presets: ['@babel/preset-env']
       }
-    ]
+    }]
   }
 };
